@@ -48,6 +48,9 @@ source .venv/bin/activate
 # Install dependencies
 echo "Installing dependencies..."
 pip3 install -r requirements.txt
+git clone https://github.com/nari-labs/dia.git
+pip3 install -q ./dia
+pip3 install -q soundfile
 
 # Configure systemd to run the app
 echo "Configuring systemd service..."
