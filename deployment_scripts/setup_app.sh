@@ -8,7 +8,7 @@ if [ "$confirm" != "y" ]; then
 fi
 
 # Set up application directory
-APP_DIR="/home/$(whoami)/ai_voice_chat"
+APP_DIR="/home/$(whoami)/ai_voice_chat/"
 
 # Check if directory exists, if so, ask to delete
 if [ -d "$APP_DIR" ]; then
@@ -38,7 +38,7 @@ echo "Copying application files..."
 git clone -b main git@github.com:abu-zahid/v2v.git
 cd v2v
 cp .env.example .env
-
+APP_DIR="/home/$(whoami)/ai_voice_chat/v2v/"
 
 # Create virtual environment
 echo "Setting up Python virtual environment..."
