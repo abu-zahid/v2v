@@ -1,0 +1,13 @@
+[Unit]
+Description=Uvicorn instance to serve the Lifewink AI Voice Chat
+After=network.target
+
+[Service]
+User=abu_zahid
+Group=www-data
+WorkingDirectory=/home/abu_zahid/dia
+Environment="PATH=/home/abu_zahid/dia/.venv/bin"
+ExecStart=/home/abu_zahid/dia/.venv/bin/uvicorn main:app --uds .sock --workers 4
+
+[Install]
+WantedBy=multi-user.target
