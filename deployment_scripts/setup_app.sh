@@ -8,7 +8,7 @@ if [ "$confirm" != "y" ]; then
 fi
 
 # Set up application directory
-APP_DIR="/home/$(whoami)/ai_voice_chat/"
+APP_DIR="/home/$(whoami)/ai_voice_chat"
 
 # Check if directory exists, if so, ask to delete
 if [ -d "$APP_DIR" ]; then
@@ -33,12 +33,13 @@ cd "$APP_DIR"
 # In a real-world scenario, you might clone from a repository
 echo "Copying application files..."
 
-
 # clone the repo
 git clone -b main git@github.com:abu-zahid/v2v.git
 cd v2v
 cp .env.example .env
-APP_DIR="/home/$(whoami)/ai_voice_chat/v2v/"
+
+# Update APP_DIR to include v2v subdirectory
+V2V_DIR="$APP_DIR/v2v"  # Store the v2v directory path separately to avoid confusion
 
 # Create virtual environment
 echo "Setting up Python virtual environment..."
@@ -48,9 +49,20 @@ source .venv/bin/activate
 # Install dependencies
 echo "Installing dependencies..."
 pip3 install -r requirements.txt
-git clone https://github.com/nari-labs/dia.git
+git clone https://github.com/nari-labs/dia.git 2>/dev/null || echo "dia repository already exists"
 pip3 install -q ./dia
 pip3 install -q soundfile
+
+# Make sure demo_frontend directory exists
+mkdir -p "$V2V_DIR/demo_frontend"
+
+# Copy frontend files if available
+if [ -f "$V2V_DIR/index.html" ] && [ -f "$V2V_DIR/app.js" ] && [ -f "$V2V_DIR/styles.css" ]; then
+    cp "$V2V_DIR/index.html" "$V2V_DIR/app.js" "$V2V_DIR/styles.css" "$V2V_DIR/demo_frontend/"
+    echo "Frontend files copied to demo_frontend directory."
+else
+    echo "Warning: Some frontend files not found. Make sure to manually add them to $V2V_DIR/demo_frontend/"
+fi
 
 # Configure systemd to run the app
 echo "Configuring systemd service..."
@@ -65,9 +77,9 @@ After=network.target
 [Service]
 User=$(whoami)
 Group=www-data
-WorkingDirectory=$APP_DIR
-Environment="PATH=$APP_DIR/.venv/bin"
-ExecStart=/bin/bash -c 'source $APP_DIR/.venv/bin/activate && $APP_DIR/.venv/bin/uvicorn main:app --uds $APP_DIR/.sock --workers 4'
+WorkingDirectory=$V2V_DIR
+# Using absolute paths to ensure clarity
+ExecStart=/bin/bash -c 'source $V2V_DIR/.venv/bin/activate && $V2V_DIR/.venv/bin/uvicorn main:app --uds $V2V_DIR/.sock --workers 4'
 
 [Install]
 WantedBy=multi-user.target
@@ -83,38 +95,41 @@ server {
     server_name _;
 
     location /demo {
-        alias $APP_DIR/demo_frontend;
+        alias $V2V_DIR/demo_frontend;
         index index.html;
         try_files \$uri \$uri/ /index.html;
     }
 
     location /ai-voice-chat {
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_redirect off;
         proxy_buffering off;
-        proxy_pass http://unix:$APP_DIR/.sock;
+        proxy_pass http://unix:$V2V_DIR/.sock;
     }
 }
 
-upstream ai_voice_chat {
-    server unix:$APP_DIR/.sock;
-}
-
+# Make sure nginx configuration has the correct socket path
 map \$http_upgrade \$connection_upgrade {
-        default upgrade;
-        '' close;
+    default upgrade;
+    '' close;
 }
 EOF
 
 sudo cp ai_voice_chat.conf /etc/nginx/conf.d/
 
 # Enable nginx configuration
-sudo rm -f /etc/nginx/sites-enabled/default
+sudo rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
 sudo usermod -aG $(whoami) www-data
+
+# Fix permissions
+echo "Setting proper permissions..."
+sudo chown -R $(whoami):www-data $V2V_DIR
+sudo chmod -R 750 $V2V_DIR
+
 
 # Restart services
 echo "Restarting services..."
@@ -125,3 +140,7 @@ sudo systemctl restart nginx
 
 echo "[$(date)] App installed." >> /var/log/ai_voice_chat/setup.log
 echo "Installation complete! The application is now running."
+echo ""
+echo "You can access the application at: http://$(curl -s ifconfig.me)/demo"
+echo "To check service status: sudo systemctl status ai_voice_chat"
+echo "To check logs: sudo journalctl -u ai_voice_chat -f"
