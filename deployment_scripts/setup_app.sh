@@ -67,7 +67,7 @@ User=$(whoami)
 Group=www-data
 WorkingDirectory=$APP_DIR
 Environment="PATH=$APP_DIR/.venv/bin"
-ExecStart=$APP_DIR/.venv/bin/uvicorn main:app --uds .sock --workers 4
+ExecStart=/bin/bash -c 'source $APP_DIR/.venv/bin/activate && $APP_DIR/.venv/bin/uvicorn main:app --uds $APP_DIR/.sock --workers 4'
 
 [Install]
 WantedBy=multi-user.target
@@ -88,15 +88,15 @@ server {
         try_files \$uri \$uri/ /index.html;
     }
 
-    location / {
-        proxy_set_header Host \$host;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \$connection_upgrade;
+    location /ai-voice-chat {
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_redirect off;
         proxy_buffering off;
-        proxy_pass http://ai_voice_chat;
+        proxy_pass http://unix:$APP_DIR/.sock;
     }
 }
 
